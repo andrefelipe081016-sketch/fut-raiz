@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fut Raiz - Avaliacao</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%E2%9A%BD</text></svg>">
+<style>
+  :root{--bg:#0f1419;--bg2:#171d26;--bg3:#1f2733;--line:#2a3340;--text:#e6edf3;--muted:#8b98a9;--acc:#3ea6ff;--acc2:#62d489;--warn:#ffb347;--bad:#ff6b6b;}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px}
+  header{background:linear-gradient(180deg,var(--bg2),var(--bg));border-bottom:1px solid var(--line);padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;font-weight:700}
+  header .badge{background:var(--bg3);padding:4px 10px;border-radius:999px;color:var(--muted);font-size:12px}
+  header .spacer{flex:1}
+  header .user{display:flex;gap:10px;align-items:center;font-size:13px}
+  header .user b{color:var(--acc)}
+  header button{background:var(--bg3);color:var(--text);border:1px solid var(--line);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:13px}
+  header button:hover{background:#2a3340}
+  header .avatar{width:24px;height:24px;border-radius:50%;background:var(--bg3)}
+  nav.tabs{background:var(--bg2);border-bottom:1px solid var(--line);padding:0 20px;display:flex;gap:4px;overflow-x:auto}
+  nav.tabs button{background:none;color:var(--muted);border:none;padding:12px 16px;cursor:pointer;font-size:13px;font-weight:500;border-bottom:2px solid transparent;white-space:nowrap}
+  nav.tabs button.active{color:var(--text);border-bottom-color:var(--acc)}
+  nav.tabs button:hover{color:var(--text)}
+  main{padding:20px;max-width:1400px;margin:0 auto}
+  .card{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+  .card h2{margin:0 0 4px 0;font-size:16px}
+  .card .sub{color:var(--muted);font-size:12px;margin-bottom:14px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+  input,select{background:var(--bg3);border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:8px;width:100%;font-size:14px;font-family:inherit}
+  input:focus,select:focus{outline:none;border-color:var(--acc)}
+  .btn{background:var(--acc);color:#001a33;border:none;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px}
+  .btn:hover{filter:brightness(1.1)}
+  .btn.sec{background:var(--bg3);color:var(--text);border:1px solid var(--line)}
+  .btn.warn{background:var(--warn);color:#1a0f00}
+  .btn.danger{background:var(--bad);color:#fff}
+  .btn.good{background:var(--acc2);color:#001a0d}
+  .btn.google{background:#fff;color:#202124;display:inline-flex;align-items:center;gap:10px;padding:12px 24px;font-size:15px}
+  .row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .row > *{flex:1;min-width:160px}
+  .pill{display:inline-block;background:var(--bg3);padding:2px 8px;border-radius:999px;font-size:11px;color:var(--muted);margin-right:4px}
+  .pill.adm{background:rgba(62,166,255,.15);color:var(--acc)}
+  .filter-bar{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  .filter-bar .chip{background:var(--bg3);color:var(--muted);border:1px solid var(--line);padding:6px 12px;border-radius:999px;cursor:pointer;font-size:12px}
+  .filter-bar .chip.active{background:var(--acc);color:#001a33;border-color:var(--acc);font-weight:600}
+  .filter-bar input.search{flex:1;max-width:260px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  table th{text-align:left;padding:10px 8px;background:var(--bg3);font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line)}
+  table td{padding:8px;border-bottom:1px solid var(--line)}
+  table tr:hover td{background:rgba(255,255,255,.02)}
+  table td.num{text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
+  .arrow-up{color:var(--acc2);font-size:11px;margin-left:3px}
+  .arrow-dn{color:var(--bad);font-size:11px;margin-left:3px}
+  .arrow-eq{color:var(--muted);font-size:11px;margin-left:3px;opacity:.5}
+  .medal{margin-right:2px}
+  .rate-input{width:56px;text-align:center;padding:5px;font-variant-numeric:tabular-nums}
+  .role-tag{font-size:14px}
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--line);padding:12px 18px;border-radius:10px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.4);z-index:1000}
+  .toast.good{border-color:var(--acc2)}
+  .toast.bad{border-color:var(--bad)}
+  .login-wrap{max-width:420px;margin:80px auto;text-align:center}
+  .login-wrap .card{padding:36px}
+  .login-wrap h1{font-size:30px;margin:0 0 6px 0}
+  .login-wrap p{color:var(--muted);margin:0 0 24px 0;font-size:13px}
+  .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .stat{background:var(--bg3);padding:14px;border-radius:10px;border:1px solid var(--line)}
+  .stat .num{font-size:22px;font-weight:700;color:var(--acc)}
+  .stat .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+  .empty{text-align:center;padding:40px;color:var(--muted)}
+  .scroll{overflow-x:auto}
+  details{background:var(--bg3);border-radius:8px;padding:10px 14px;margin-bottom:8px;border:1px solid var(--line)}
+  details summary{cursor:pointer;font-weight:600;font-size:13px}
+  .small{font-size:11px;color:var(--muted)}
+  .info-banner{background:rgba(62,166,255,.08);border:1px solid rgba(62,166,255,.3);color:var(--acc);padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:14px}
+  .warn-banner{background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.3);color:var(--warn);padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:14px}
+  .loading{position:fixed;inset:0;background:rgba(15,20,25,.85);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:14px}
+  .spinner{width:36px;height:36px;border:3px solid var(--bg3);border-top-color:var(--acc);border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .config-warn{max-width:600px;margin:80px auto;padding:30px;background:var(--bg2);border:2px solid var(--bad);border-radius:12px;text-align:center}
+  .config-warn h2{color:var(--bad);margin:0 0 14px}
+  .config-warn code{background:#000;padding:2px 6px;border-radius:4px;font-size:12px;color:var(--acc2)}
+</style>
+</head>
+<body>
+
+<!-- ===== CONFIGURACAO - substitua os 2 valores abaixo pelos do SEU projeto Supabase (README passo 3) ===== -->
+<script>
+  window.SUPABASE_URL = "https://glubesigmqszhcyqugwr.supabase.co";
+  window.SUPABASE_ANON_KEY = "sb_publishable_GsdcfF4xdS3jmpMk8WFpWw_1ChHmhPi";
+</script>
+
+<header id="hdr" style="display:none">
+  <h1>&#9917; Fut Ra&iacute;z</h1>
+  <span class="badge" id="roundLbl">Rodada: -</span>
+  <div class="spacer"></div>
+  <div class="user">
+    <img class="avatar" id="meAvatar" alt="" src="">
+    <span><b id="meName"></b> <span class="pill adm" id="meAdm" style="display:none">ADM</span></span>
+    <button onclick="signOut()">Sair</button>
+  </div>
+</header>
+<nav class="tabs" id="tabs" style="display:none"></nav>
+
+<main id="app"><div class="loading"><div class="spinner"></div><div>Conectando...</div></div></main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="./app.js"></script>
+
+</body>
+</html>
