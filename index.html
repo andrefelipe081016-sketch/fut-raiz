@@ -73,6 +73,10 @@
   .small{font-size:11px;color:var(--muted)}
   .info-banner{background:rgba(62,166,255,.08);border:1px solid rgba(62,166,255,.3);color:var(--acc);padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:14px}
   .warn-banner{background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.3);color:var(--warn);padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:14px}
+  .save-status{font-size:12px;color:var(--muted);padding-left:10px}
+  .save-status.saving{color:var(--warn)}
+  .save-status.saved{color:var(--acc2)}
+  .save-status.error{color:var(--bad)}
   .loading{position:fixed;inset:0;background:rgba(15,20,25,.85);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:14px}
   .spinner{width:36px;height:36px;border:3px solid var(--bg3);border-top-color:var(--acc);border-radius:50%;animation:spin 1s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -83,7 +87,6 @@
 </head>
 <body>
 
-<!-- ===== CONFIGURACAO - substitua os 2 valores abaixo pelos do SEU projeto Supabase (README passo 3) ===== -->
 <script>
   window.SUPABASE_URL = "https://glubesigmqszhcyqugwr.supabase.co";
   window.SUPABASE_ANON_KEY = "sb_publishable_GsdcfF4xdS3jmpMk8WFpWw_1ChHmhPi";
@@ -106,6 +109,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="./matches.js"></script>
 <script src="./app.js"></script>
 
 </body>

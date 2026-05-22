@@ -8,12 +8,15 @@ const GK_ATTRS   = ['BASE','CHU. LG','IMPULSO','LANCA','PASSE. LG','REFLEXO','PO
 let supa = null;
 let session = null;
 let me = null;
-let cache = { players:[], evaluations:[], profiles:[], rounds:[], settings:{} };
+let cache = { players:[], evaluations:[], profiles:[], rounds:[], settings:{}, matches:[], matchStats:[] };
 let currentTab = 'avaliar';
 let filterRole = 'TODOS';
 let searchTxt = '';
 let rankingAttr = 'TODOS';
 let viewingUserId = null;
+let saveStatus = 'idle'; // 'idle' | 'saving' | 'saved' | 'error'
+let pendingSaves = 0;    // contador de saves pendentes
+let matchSearchTxt = '';  // busca de jogador na partida
 
 /* Limites: tudo 60-99, PNR vai 0-5 */
 function attrMin(a){ return a==='PNR' ? 0 : 60; }
@@ -73,12 +76,14 @@ async function loadProfile(){
 
 async function loadAll(){
   document.getElementById('app').innerHTML = '<div class="loading"><div class="spinner"></div><div>Carregando dados...</div></div>';
-  const [players, evals, profiles, rounds, settings] = await Promise.all([
+  const [players, evals, profiles, rounds, settings, matches, mstats] = await Promise.all([
     supa.from('players').select('*').order('name'),
     supa.from('evaluations').select('*'),
     supa.from('profiles').select('*').order('name'),
     supa.from('rounds').select('*').order('closed_at', {ascending:true}),
     supa.from('settings').select('*'),
+    supa.from('matches').select('*').order('created_at', {ascending:false}),
+    supa.from('match_stats').select('*'),
   ]);
   cache.players = players.data || [];
   cache.evaluations = evals.data || [];
@@ -86,6 +91,8 @@ async function loadAll(){
   cache.rounds = rounds.data || [];
   cache.settings = {};
   (settings.data||[]).forEach(s => cache.settings[s.key] = s.value);
+  cache.matches = matches.data || [];
+  cache.matchStats = mstats.data || [];
 }
 
 let realtimeReady = false;
@@ -144,17 +151,52 @@ function arrow(curr, prev){
 
 /* ---------- ESCRITAS ---------- */
 const evalTimers = {};
-async function persistEval(playerId, attr, val){
-  if(val==null){
-    await supa.from('evaluations').delete().match({user_id: me.id, player_id: playerId, attr});
-    cache.evaluations = cache.evaluations.filter(x => !(x.user_id===me.id && x.player_id===playerId && x.attr===attr));
-  } else {
-    const { error } = await supa.from('evaluations').upsert({user_id: me.id, player_id: playerId, attr, value: val});
-    if(error){ toast('Erro: '+error.message, 'bad'); return; }
-    const i = cache.evaluations.findIndex(x => x.user_id===me.id && x.player_id===playerId && x.attr===attr);
-    if(i>=0) cache.evaluations[i].value = val;
-    else cache.evaluations.push({user_id: me.id, player_id: playerId, attr, value: val});
+function setSaveStatus(s){
+  saveStatus = s;
+  const el = document.getElementById('saveStatus');
+  if(el){
+    const map = {idle:'', saving:'⏳ Salvando...', saved:'✓ Salvo', error:'✗ Erro ao salvar'};
+    el.textContent = map[s] || '';
+    el.className = 'save-status ' + s;
   }
+}
+async function persistEval(playerId, attr, val){
+  pendingSaves++;
+  setSaveStatus('saving');
+  try {
+    if(val==null){
+      await supa.from('evaluations').delete().match({user_id: me.id, player_id: playerId, attr});
+      cache.evaluations = cache.evaluations.filter(x => !(x.user_id===me.id && x.player_id===playerId && x.attr===attr));
+    } else {
+      const { error } = await supa.from('evaluations').upsert({user_id: me.id, player_id: playerId, attr, value: val});
+      if(error){ setSaveStatus('error'); toast('Erro: '+error.message, 'bad'); return; }
+      const i = cache.evaluations.findIndex(x => x.user_id===me.id && x.player_id===playerId && x.attr===attr);
+      if(i>=0) cache.evaluations[i].value = val;
+      else cache.evaluations.push({user_id: me.id, player_id: playerId, attr, value: val});
+    }
+  } catch(e){ setSaveStatus('error'); toast('Erro: '+e.message, 'bad'); return; }
+  finally {
+    pendingSaves--;
+    if(pendingSaves===0) setSaveStatus('saved');
+  }
+}
+async function saveAllPending(){
+  // força flush de todos os timers de debounce
+  Object.keys(evalTimers).forEach(k => {
+    if(evalTimers[k]){ clearTimeout(evalTimers[k]); }
+  });
+  // dispara save de cada input atual da tela
+  setSaveStatus('saving');
+  const inputs = document.querySelectorAll('input.rate-input');
+  for(const inp of inputs){
+    const ph = inp.getAttribute('data-pid'), at = inp.getAttribute('data-attr');
+    if(ph && at){
+      const raw = inp.value;
+      if(raw==='' || raw==null) await persistEval(ph, at, null);
+      else { const n = parseInt(raw,10); if(!isNaN(n)) await persistEval(ph, at, clampAttr(at, n)); }
+    }
+  }
+  toast('Tudo salvo!', 'good');
 }
 function setEval(playerId, attr, raw){
   const n = parseInt(raw,10);
@@ -250,7 +292,7 @@ function render(){
   document.getElementById('meAdm').style.display = isAdmin() ? 'inline-block' : 'none';
   document.getElementById('roundLbl').textContent = 'Rodada: '+currentRound();
   renderTabs();
-  const fn = {avaliar:renderAvaliar, dashboard:renderDashboard, ranks:renderRanksIndividuais, jogadores:renderJogadores, membros:renderMembros, historico:renderHistorico}[currentTab] || renderAvaliar;
+  const fn = {avaliar:renderAvaliar, dashboard:renderDashboard, score:renderScore, ranks:renderRanksIndividuais, jogadores:renderJogadores, membros:renderMembros, historico:renderHistorico}[currentTab] || renderAvaliar;
   document.getElementById('app').innerHTML = fn();
 }
 
@@ -258,6 +300,7 @@ function renderTabs(){
   const tabs = [
     {id:'avaliar', label:'📝 Minha Avaliação'},
     {id:'dashboard', label:'📊 Dashboard'},
+    {id:'score', label:'⚽ Score dos Futs'},
   ];
   if(isAdmin()){
     tabs.push({id:'ranks', label:'👁️ Ranks Individuais'});
@@ -314,7 +357,7 @@ function renderAvaliar(){
       '<tr><td><b>'+p.name+'</b> <span class="role-tag">'+roleEmoji(p.role)+'</span></td>'+
       attrs.map(a => {
         const v = getMyEval(p.id, a);
-        return '<td class="num"><input class="rate-input" type="number" min="'+attrMin(a)+'" max="'+attrMax(a)+'" value="'+(v==null?'':v)+'" oninput="setEval(\''+p.id+'\',\''+a+'\',this.value)" onblur="snapEval(\''+p.id+'\',\''+a+'\',this)" onkeydown="if(event.key===\'Enter\'){this.blur();}"></td>';
+        return '<td class="num"><input class="rate-input" data-pid="'+p.id+'" data-attr="'+a+'" type="number" min="'+attrMin(a)+'" max="'+attrMax(a)+'" value="'+(v==null?'':v)+'" oninput="setEval(\''+p.id+'\',\''+a+'\',this.value)" onblur="snapEval(\''+p.id+'\',\''+a+'\',this)" onkeydown="if(event.key===\'Enter\'){this.blur();}"></td>';
       }).join('')+'</tr>'
     ).join('')+'</tbody></table></div>';
   }
@@ -323,6 +366,7 @@ function renderAvaliar(){
     '<div class="sub">Dê uma nota pra cada atributo. Seus dados salvam automaticamente no banco.</div>'+
     '<div class="info-banner">🗓️ A rodada é encerrada manualmente pelo admin. Enquanto isso, você pode ajustar suas notas à vontade.</div>'+
     '<p class="small" style="margin:8px 0 14px 0"><i>min. 60 | máx. 99</i> &nbsp;·&nbsp; <i>PNR: 0 a 5</i> &nbsp;·&nbsp; valores fora do limite são ajustados ao perder o foco / apertar Enter</p>'+
+    '<div class="row" style="margin-bottom:14px;align-items:center"><button class="btn good" style="flex:0;min-width:140px" onclick="saveAllPending()">💾 Salvar agora</button><span id="saveStatus" class="save-status '+saveStatus+'">'+({idle:'Auto-save ligado',saving:'⏳ Salvando...',saved:'✓ Salvo',error:'✗ Erro ao salvar'}[saveStatus]||'')+'</span></div>'+
     renderFilterBar()+
     (lineList.length>0?'<h2 style="font-size:14px;margin-top:18px">Jogadores de linha</h2>'+tableFor(lineList, LINE_ATTRS):'')+
     (gkList.length>0?'<h2 style="font-size:14px;margin-top:24px">Goleiros</h2>'+tableFor(gkList, GK_ATTRS):'')+
@@ -624,6 +668,30 @@ function gerarPDF(){
     doc.autoTable({startY:60, head:[['Nome'].concat(GK_ATTRS).concat(['OVERALL'])], body:gkRows,
       styles:{fontSize:8,cellPadding:3}, headStyles:{fillColor:[31,39,51],textColor:[255,255,255]}});
   }
+
+  // Rank Geral por OVERALL (todos jogadores, do maior pro menor)
+  doc.addPage();
+  doc.setFontSize(14);
+  doc.text('Rank Geral - OVERALL', 40, 40);
+  const allOv = cache.players.map(p => ({p, ov: avgOverall(p)})).filter(x => x.ov != null).sort((a,b) => b.ov - a.ov);
+  let ovPos = 1, ovLast = null, ovLastPos = 1;
+  const ovRows = allOv.map(x => {
+    let pos;
+    if(ovLast === null || x.ov < ovLast){ pos = ovPos; ovLastPos = ovPos; ovLast = x.ov; }
+    else pos = ovLastPos;
+    ovPos++;
+    const tag = x.p.role==='ATACANTE'?'(ATA)':x.p.role==='DEFENSOR'?'(DEF)':'(GK)';
+    let delta = '';
+    if(snap && snap.averages[x.p.id] && snap.averages[x.p.id].OVERALL!=null){
+      const d = x.ov - snap.averages[x.p.id].OVERALL;
+      if(d>0) delta = ' (+'+d+')'; else if(d<0) delta = ' ('+d+')';
+    }
+    return [pos+'o', x.p.name+' '+tag, x.ov + delta];
+  });
+  doc.autoTable({startY: 60, head: [['Pos.', 'Jogador', 'OVERALL']], body: ovRows,
+    styles:{fontSize:9, cellPadding:4}, headStyles:{fillColor:[31,39,51], textColor:[255,255,255]},
+    alternateRowStyles:{fillColor:[245,245,250]},
+    columnStyles: {0:{cellWidth:60, halign:'center'}, 2:{cellWidth:90, halign:'center'}}});
 
   doc.addPage(); doc.setFontSize(14); doc.text('Ranks individuais - Jogadores de linha', 40, 40);
   let yPos = 60;
