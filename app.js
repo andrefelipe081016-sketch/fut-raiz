@@ -96,12 +96,28 @@ async function loadAll(){
 }
 
 let realtimeReady = false;
+let realtimeReloadTimer = null;
+let realtimeReloading = false;
+async function realtimeReloadOnce(){
+  if(realtimeReloading) return;
+  if(pendingSaves > 0) {
+    // ainda salvando — adia 500ms pra não pisar nos saves do user
+    clearTimeout(realtimeReloadTimer);
+    realtimeReloadTimer = setTimeout(realtimeReloadOnce, 500);
+    return;
+  }
+  realtimeReloading = true;
+  try { await loadAll(); render(); }
+  finally { realtimeReloading = false; }
+}
 function setupRealtime(){
-  if(realtimeReady) return;  // evita subscrição duplicada
+  if(realtimeReady) return;
   realtimeReady = true;
   try {
-    supa.channel('public-changes').on('postgres_changes', {event:'*', schema:'public'}, async () => {
-      await loadAll(); render();
+    supa.channel('public-changes').on('postgres_changes', {event:'*', schema:'public'}, () => {
+      // Debounce: agrupa muitos eventos em uma única recarga
+      clearTimeout(realtimeReloadTimer);
+      realtimeReloadTimer = setTimeout(realtimeReloadOnce, 800);
     }).subscribe();
   } catch(e){ console.warn('realtime setup failed (não-bloqueante)', e); }
 }
