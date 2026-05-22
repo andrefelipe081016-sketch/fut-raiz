@@ -28,7 +28,19 @@ async function init(){
     document.getElementById('app').innerHTML = '<div class="config-warn"><h2>&#9888; Configuracao pendente</h2><p>Edite o <code>index.html</code> e substitua <code>SUPABASE_URL</code> e <code>SUPABASE_ANON_KEY</code> pelos valores do seu Supabase. Veja README passo 3.</p></div>';
     return;
   }
-  supa = window.supabase.createClient(URL, KEY);
+  supa = window.supabase.createClient(URL, KEY, {
+    auth: {
+      flowType: 'pkce',
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true,
+      storage: window.localStorage
+    }
+  });
+  // Se voltou do OAuth com code/hash, aguarda processar antes de renderizar
+  if (window.location.search.includes('code=') || window.location.hash.includes('access_token')) {
+    await new Promise(r => setTimeout(r, 1200));
+  }
   const { data:{ session: s } } = await supa.auth.getSession();
   await onAuthChange(s);
   supa.auth.onAuthStateChange(async (_, s) => { await onAuthChange(s); });
@@ -49,8 +61,8 @@ async function onAuthChange(s){
     return;
   }
   await loadAll();
-  setupRealtime();
-  render();
+  render();           // render PRIMEIRO (não bloqueia se realtime falhar)
+  setupRealtime();    // depois tenta realtime
 }
 
 async function loadProfile(){
@@ -76,10 +88,15 @@ async function loadAll(){
   (settings.data||[]).forEach(s => cache.settings[s.key] = s.value);
 }
 
+let realtimeReady = false;
 function setupRealtime(){
-  supa.channel('public-changes').on('postgres_changes', {event:'*', schema:'public'}, async () => {
-    await loadAll(); render();
-  }).subscribe();
+  if(realtimeReady) return;  // evita subscrição duplicada
+  realtimeReady = true;
+  try {
+    supa.channel('public-changes').on('postgres_changes', {event:'*', schema:'public'}, async () => {
+      await loadAll(); render();
+    }).subscribe();
+  } catch(e){ console.warn('realtime setup failed (não-bloqueante)', e); }
 }
 
 /* ---------- AUTH ---------- */
